@@ -37,7 +37,9 @@ Mat matchTemplate(const Mat &search, const Mat &templ, int match_method) {
 	}
 
 	Mat search_copy(search);
-	rectangle(search_copy, matchIdx, Point(matchIdx.x + templ.cols, matchIdx.y + templ.rows), Scalar::all(0), 2, 8, 0);
+	cvtColor(search, search_copy, COLOR_GRAY2BGR);
+	rectangle(search_copy, Rect(matchIdx, Point(matchIdx.x + templ.cols, matchIdx.y + templ.rows)), Scalar(0, 255, 0), 2);
+	// rectangle(search_copy, matchIdx, Point(matchIdx.x + templ.cols, matchIdx.y + templ.rows), Scalar::all(0), 2, 8, 0);
 
 	return search_copy;
 }
