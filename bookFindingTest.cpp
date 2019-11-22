@@ -17,7 +17,7 @@ const int bucketSize = 256 / bin;
 const int blue = 0;
 const int green = 1;
 const int red = 2;
-
+const Scalar color = Scalar(0, 0, 255);
 
 /*
 * Create Histogram function:
@@ -145,6 +145,10 @@ int main(int argc, char* argv[])
 		double area = contourArea(contours[i]);
 		cout << "area of object # " << i << " = " << area << endl;
 
+		if (area < 600) {
+			continue;
+		}
+
 		double length = arcLength(contours[i], true);
 		cout << "length of object # " << i << " = " << length << endl;
 
@@ -177,10 +181,10 @@ int main(int argc, char* argv[])
 		else {
 			// label it as a book and draw the contour
 			string tmp = "Book [" + std::to_string(bookNumber) + "]";
-			putText(image, tmp, Point(points[1].x + 5, points[1].y - 15), FONT_HERSHEY_COMPLEX_SMALL, .75, Scalar(0, 0, 255), 1.75);
+			putText(image, tmp, Point(points[1].x + 15, points[1].y - 15), FONT_HERSHEY_COMPLEX_SMALL, 1, color, 1.9);
 			bookNumber++;
-			drawContours(image, contours, bookNumber, Scalar(0, 0, 255), 2);
-			//cv::rectangle(image, rectangle, Scalar(0, 0, 255), 2);
+			drawContours(image, contours, bookNumber, color, 2);
+			// cv::rectangle(image, rectangle, color, 2);
 		}
 	}
 
