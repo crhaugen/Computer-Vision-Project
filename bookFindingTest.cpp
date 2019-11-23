@@ -112,8 +112,8 @@ bool isSolidColor(const Mat& input) {
 			if (input.at<Vec3b>(row, col)[blue] - bucketSize <= b && input.at<Vec3b>(row, col)[blue] + bucketSize >= b &&
 				input.at<Vec3b>(row, col)[green] - bucketSize <= g && input.at<Vec3b>(row, col)[green] + bucketSize >= g &&
 				input.at<Vec3b>(row, col)[red] - bucketSize <= r && input.at<Vec3b>(row, col)[red] + bucketSize >= r) {
-					// if so increase the total
-					total++;
+				// if so increase the total
+				total++;
 			}
 		}
 	}
@@ -124,20 +124,27 @@ bool isSolidColor(const Mat& input) {
 	return false;
 }
 
+
 int main(int argc, char* argv[])
 {
 	Mat image = imread("bookTest.jpg");
+	//Mat image = imread("bookTest#2.jpg");
 	Mat greyImage;
 	vector<vector<Point>> contours;
 	vector<Vec4i> hierarchy;
-	
+
 	cvtColor(image, greyImage, COLOR_BGR2GRAY);
 	GaussianBlur(greyImage, greyImage, Size(3, 3), 0);
-	Canny(greyImage, greyImage, 100,550);
-	
+	double threshold = 100;
+	Canny(greyImage, greyImage, threshold, threshold * 2);
+	dilate(greyImage, greyImage, Mat(), Point(-1, -1));
+	imshow("Canny", greyImage);
 	findContours(greyImage, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 	
+	drawContours(image, contours, -1, Scalar(0, 255, 0), 2);
+	//imshow("con", image);
 	int bookNumber = 0;
+	vector<Point> points;
 
 	for (int i = 0; i < contours.size(); ++i)
 	{
@@ -145,6 +152,24 @@ int main(int argc, char* argv[])
 		double area = contourArea(contours[i]);
 		cout << "area of object # " << i << " = " << area << endl;
 
+		double epsilon = .1 * arcLength(contours[i], true);
+
+		
+		approxPolyDP(contours[i], points, epsilon, true);
+
+
+		if (points.size() == 4)
+		{
+			cout << "THIS IS A RECTANGLE, SIZE " << points.size() << endl;
+		}
+		else
+		{
+			cout << "THIS IS NOT A RECTANGLE, SIZE " << points.size()  << endl;
+			continue;
+		}
+
+
+		
 		if (area < 600) {
 			continue;
 		}
@@ -181,7 +206,7 @@ int main(int argc, char* argv[])
 		else {
 			// label it as a book and draw the contour
 			string tmp = "Book [" + std::to_string(bookNumber) + "]";
-			putText(image, tmp, Point(points[1].x + 15, points[1].y - 15), FONT_HERSHEY_COMPLEX_SMALL, 1, color, 1.9);
+			putText(image, tmp, Point(points[1].x + 15, points[1].y - 15), FONT_HERSHEY_COMPLEX_SMALL, 1, color, 2.9);
 			bookNumber++;
 			drawContours(image, contours, bookNumber, color, 2);
 			// cv::rectangle(image, rectangle, color, 2);
