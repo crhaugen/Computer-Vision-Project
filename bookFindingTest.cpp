@@ -137,25 +137,25 @@ bool isSolidColor(const Mat& input) {
 void findBounds(double meanColor, int &lowerThreshold, int &upperThreshold)
 {
 	double sigma = 0.33;
-	if (meanColor > 191) 
+	if (meanColor > 195) 
 	{
 		lowerThreshold = (int)max(double(0), (1 - 2 * sigma) * (255 - meanColor));
-		upperThreshold = (int)max(double(85), (1 + 2 * sigma) * (255 - meanColor));
+		upperThreshold = lowerThreshold * 2;
 	}
-	else if (meanColor > 127) 
+	else if (meanColor > 130) 
 	{
 		lowerThreshold = (int)max(double(0), (1 - sigma) * (255 - meanColor));
-		upperThreshold = (int)min(double(255), (1 + sigma) * (255 - meanColor));
+		upperThreshold = lowerThreshold * 2;
 	}
-	else if (meanColor < 63) 
+	else if (meanColor < 60) 
 	{
 		lowerThreshold = (int)max(double(0), (1 - 2 * sigma) * meanColor);
-		upperThreshold = (int)max(double(85), (1 + 2 * sigma) * meanColor);
+		upperThreshold = lowerThreshold * 2;
 	}
 	else
 	{
 		lowerThreshold = (int)max(double(0), (1 - sigma) * meanColor);
-		upperThreshold = (int)min(double(255), (1 + sigma) * meanColor);
+		upperThreshold = lowerThreshold * 2;
 	}
 }
 
