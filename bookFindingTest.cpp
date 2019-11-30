@@ -9,6 +9,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm> 
+#include <regex>
 
 
 using namespace cv;
@@ -121,7 +122,7 @@ bool isSolidColor(const Mat& input) {
 	}
 	// divide the sum by the total number of pixels
 	total = total / (input.rows * input.cols);
-	if (total > .85)
+	if (total > .95)
 		return true;
 	return false;
 }
@@ -141,24 +142,26 @@ vector<Rect> findBooks(Mat &image, vector<vector<Point>> &bookContours)
 	Mat grayImage;
 
 	cvtColor(image, grayImage, COLOR_BGR2GRAY);
-	GaussianBlur(grayImage, grayImage, Size(3, 3), 0);
+	GaussianBlur(grayImage, grayImage, Size(3, 3),2.5,2.5, 4);
 
 	Scalar meanColor = mean(grayImage);
 	cout << " " << meanColor[0] << endl;
 
 
-	for (int i = 50; i < 255; i += 50)
+	for (int i = 55; i < 255; i += 75)
 	{
 		vector<vector<Point>> contours;
 	    vector<Vec4i> hierarchy;
 		int lowerThreshold = i;
 		int upperThreshold = (int)min(lowerThreshold * 3, 255);
-
 		Canny(grayImage, grayImage, lowerThreshold, upperThreshold);
-		Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 2, 2 * 2 + 2), Point(2, 2));
+		GaussianBlur(grayImage, grayImage, Size(3, 3), 1.5, 1.5, 2);
+
+		Mat element = getStructuringElement(MORPH_RECT, Size(4.5, 4.5), Point(1, 1));
 		dilate(grayImage, grayImage, element);
 		namedWindow("Canny", WINDOW_AUTOSIZE);
 		imshow("Canny", grayImage);
+
 		 
 		findContours(grayImage, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 		
@@ -282,45 +285,63 @@ bool bookAlreadyFound(vector<Point> booksFound, int x, int y)
 	return false;
 }
 
+
 int main(int argc, char* argv[])
 {
-	Mat image = imread("bookTest#5.jpg");
-	vector<vector<Point>> contours;
-	vector<Rect> books = findBooks(image, contours);
-	
-    int bookNumber = 0;
-	vector<Point> foundBooks;
+	// create a vector of directory images;
+	vector<String> directoryImages;
+	// set the directory location to the current folder
+	glob("./*.jpg", directoryImages, false);
+	// vector to hold the images found in current directory
+	vector<Mat> images;
+	//number of jpg files in images folder
+	int count = directoryImages.size();
 
-    for (int i = 0; i < books.size(); i++)
-    {
-		Mat disp(image, books[i]);
-
-		if (isSolidColor(disp) || !findMarkers(disp)) 
-		{
-		    continue;
+	// for each image in the directory look for books
+	for (int i = 0; i < count; i++) {
+		string removeDuplicates = directoryImages[i].substr(0, 5);
+		cout << "\t substring: " << removeDuplicates << endl;
+		if (removeDuplicates.compare(".\out") == 0) {
+			directoryImages.erase(directoryImages.begin()+i);
+			continue;
 		}
-		else 
+		Mat image = imread(directoryImages[i]);
+		// Mat image = imread("bookTest#5.jpg");
+		vector<vector<Point>> contours;
+		vector<Rect> books = findBooks(image, contours);
+
+		int bookNumber = 1;
+		vector<Point> foundBooks;
+
+		for (int i = 0; i < books.size(); i++)
 		{
-			if (!bookAlreadyFound(foundBooks, books[i].x, books[i].y))
+			Mat disp(image, books[i]);
+
+			if (isSolidColor(disp) || !findMarkers(disp))
 			{
-				drawContours(image, contours, i, Scalar(0, 255, 0), 2);
-				foundBooks.push_back(Point(books[i].x, books[i].y));
-				cout << "book x " << books[i].x;
-				cout << "book y " << books[i].y;
-				
-				string tmp = "Book [" + std::to_string(bookNumber) + "]";
-				putText(image, tmp, Point(books[i].x + 1, books[i].y + 20), FONT_HERSHEY_COMPLEX_SMALL, 1, color, 2.9);
-				bookNumber++;
+				continue;
+			}
+			else
+			{
+				if (!bookAlreadyFound(foundBooks, books[i].x, books[i].y))
+				{
+					drawContours(image, contours, i, Scalar(0, 255, 0), 2);
+					foundBooks.push_back(Point(books[i].x, books[i].y));
+					cout << "book x " << books[i].x;
+					cout << "book y " << books[i].y;
+
+					string bookNum = "Book [" + std::to_string(bookNumber) + "]";
+					putText(image, bookNum, Point(books[i].x + 1, books[i].y + 20), FONT_HERSHEY_COMPLEX_SMALL, .9, color, 2.9);
+					bookNumber++;
+				}
 			}
 		}
-    }
-
-	namedWindow("Output", WINDOW_AUTOSIZE);
-	//namedWindow("Output", WINDOW_NORMAL);
-	//resizeWindow("Output", 600, 600);
-	imshow("Output", image);
-	imwrite("output.jpg", image);
-	waitKey(0);
-
+		string name = "output" + std::to_string(i + 1);
+		namedWindow(name, WINDOW_AUTOSIZE);
+		imshow(name, image);
+		imwrite(name+".jpg", image);
+		waitKey(0);
+ 	}
+	directoryImages.clear();
 	return 0;
 }
