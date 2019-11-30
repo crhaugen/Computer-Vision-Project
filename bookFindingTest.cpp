@@ -1,4 +1,5 @@
 #include <opencv2/core.hpp>
+#include <opencv2/core/utility.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
@@ -9,7 +10,6 @@
 #include <vector>
 #include <cmath>
 #include <algorithm> 
-#include <regex>
 
 
 using namespace cv;
@@ -21,7 +21,6 @@ const int blue = 0;
 const int green = 1;
 const int red = 2;
 const Scalar color = Scalar(0, 0, 255);
-
 /*
 * Create Histogram function:
 *	This function creates a color histogram using 3D matrix and looping through an image assigning each of
@@ -130,19 +129,19 @@ bool isSolidColor(const Mat& input) {
 
 /*
 * findBooks:
-*	Function takes images and tries to identify as many possible books as 
+*	Function takes images and tries to identify as many possible books as
 *		it can.
 *		Postconditions: image is a valid image.
 *       Postconditions: vector containing all the possible books found.
 */
-vector<Rect> findBooks(Mat &image, vector<vector<Point>> &bookContours)
+vector<Rect> findBooks(Mat& image, vector<vector<Point>>& bookContours)
 {
-	
+
 	vector<Rect> books;
 	Mat grayImage;
 
 	cvtColor(image, grayImage, COLOR_BGR2GRAY);
-	GaussianBlur(grayImage, grayImage, Size(3, 3),2.5,2.5, 4);
+	GaussianBlur(grayImage, grayImage, Size(3, 3), 2.5, 2.5, 4);
 
 	Scalar meanColor = mean(grayImage);
 	cout << " " << meanColor[0] << endl;
@@ -151,7 +150,7 @@ vector<Rect> findBooks(Mat &image, vector<vector<Point>> &bookContours)
 	for (int i = 55; i < 255; i += 75)
 	{
 		vector<vector<Point>> contours;
-	    vector<Vec4i> hierarchy;
+		vector<Vec4i> hierarchy;
 		int lowerThreshold = i;
 		int upperThreshold = (int)min(lowerThreshold * 3, 255);
 		Canny(grayImage, grayImage, lowerThreshold, upperThreshold);
@@ -159,16 +158,16 @@ vector<Rect> findBooks(Mat &image, vector<vector<Point>> &bookContours)
 
 		Mat element = getStructuringElement(MORPH_RECT, Size(4.5, 4.5), Point(1, 1));
 		dilate(grayImage, grayImage, element);
-		namedWindow("Canny", WINDOW_AUTOSIZE);
-		imshow("Canny", grayImage);
+		// namedWindow("Canny", WINDOW_AUTOSIZE);
+		// imshow("Canny", grayImage);
 
-		 
+
 		findContours(grayImage, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
-		
-		namedWindow("con", WINDOW_AUTOSIZE);
-		imshow("con", image); 
 
-	
+		// namedWindow("con", WINDOW_AUTOSIZE);
+		// imshow("con", image);
+
+
 		vector<Point> points;
 
 		for (int i = 0; i >= 0; i = hierarchy[i][0])
@@ -178,7 +177,6 @@ vector<Rect> findBooks(Mat &image, vector<vector<Point>> &bookContours)
 			cout << "area of object # " << i << " = " << area << endl;
 
 			double epsilon = .02 * arcLength(contours[i], true);
-
 
 			approxPolyDP(contours[i], points, epsilon, true);
 
@@ -233,19 +231,19 @@ bool findMarkers(Mat image)
 	Mat connected;
 	element = getStructuringElement(MORPH_RECT, Size(9, 1));
 	morphologyEx(grayImage, connected, MORPH_CLOSE, element);
-	
+
 	Mat mask = Mat::zeros(grayImage.size(), CV_8UC1);
 
 	vector<vector<Point>> contours;
 	vector<Vec4i> hierarchy;
 	findContours(connected, contours, hierarchy, RETR_CCOMP, CHAIN_APPROX_SIMPLE, Point(0, 0));
-	
+
 	for (int i = 0; i >= 0; i = hierarchy[i][0])
 	{
 		//find all the rectangle -ish contours in the image
 		Rect rect = boundingRect(contours[i]);
 		drawContours(mask, contours, i, Scalar(255, 255, 255), FILLED);
-	
+
 		Mat nonZero(mask, rect);
 		double ratioOfNonZeroPixel = (double)countNonZero(nonZero) / (double(rect.width) * double(rect.height));
 
@@ -273,7 +271,7 @@ bool bookAlreadyFound(vector<Point> booksFound, int x, int y)
 {
 	for (int i = 0; i < booksFound.size(); i++)
 	{
-		if((booksFound[i].x - 10) < x && x < (booksFound[i].x + 10))
+		if ((booksFound[i].x - 10) < x && x < (booksFound[i].x + 10))
 		{
 			if ((booksFound[i].y - 10) < y && y < (booksFound[i].y + 10))
 			{
@@ -290,8 +288,18 @@ int main(int argc, char* argv[])
 {
 	// create a vector of directory images;
 	vector<String> directoryImages;
+	string directoryLocation;
+
 	// set the directory location to the current folder
 	glob("./*.jpg", directoryImages, false);
+	// lambda to remove the output images so it doesn't infinitely create images
+	directoryImages.erase(
+		// remove if the directory name begins with .\output
+		remove_if(directoryImages.begin(), directoryImages.end(),
+			[](const std::string& s) {return s.find("output") != string::npos; }
+		),
+		directoryImages.end()
+	);
 	// vector to hold the images found in current directory
 	vector<Mat> images;
 	//number of jpg files in images folder
@@ -299,12 +307,7 @@ int main(int argc, char* argv[])
 
 	// for each image in the directory look for books
 	for (int i = 0; i < count; i++) {
-		string removeDuplicates = directoryImages[i].substr(0, 5);
-		cout << "\t substring: " << removeDuplicates << endl;
-		if (removeDuplicates.compare(".\out") == 0) {
-			directoryImages.erase(directoryImages.begin()+i);
-			continue;
-		}
+
 		Mat image = imread(directoryImages[i]);
 		// Mat image = imread("bookTest#5.jpg");
 		vector<vector<Point>> contours;
@@ -339,9 +342,9 @@ int main(int argc, char* argv[])
 		string name = "output" + std::to_string(i + 1);
 		namedWindow(name, WINDOW_AUTOSIZE);
 		imshow(name, image);
-		imwrite(name+".jpg", image);
+		imwrite(name + ".jpg", image);
 		waitKey(0);
- 	}
+	}
 	directoryImages.clear();
 	return 0;
 }
