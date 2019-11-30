@@ -126,38 +126,88 @@ bool isSolidColor(const Mat& input) {
 	return false;
 }
 
+
 /*
-* findBounds:
-*	Function tries to approximative a good threshold to use for finding 
-*		edges in any image. Does this based on how light/dark the grayscale image is
-*		Preconditions: meanColor contains the mean value for a given image
-*		Postconditions: lowerThreshold and upperThreshold contain calculated values.
-* 
+* findBooks:
+*	Function takes images and tries to identify as many possible books as 
+*		it can.
+*		Postconditions: image is a valid image.
+*       Postconditions: vector containing all the possible books found.
 */
-void findBounds(double meanColor, int &lowerThreshold, int &upperThreshold)
+vector<Rect> findBooks(Mat &image, vector<vector<Point>> &bookContours)
 {
-	double sigma = 0.33;
-	if (meanColor > 195) 
+	
+	vector<Rect> books;
+	Mat grayImage;
+
+	cvtColor(image, grayImage, COLOR_BGR2GRAY);
+	GaussianBlur(grayImage, grayImage, Size(3, 3), 0);
+
+	Scalar meanColor = mean(grayImage);
+	cout << " " << meanColor[0] << endl;
+
+
+	for (int i = 50; i < 255; i += 50)
 	{
-		lowerThreshold = (int)max(double(0), (1 - 2 * sigma) * (255 - meanColor));
-		upperThreshold = lowerThreshold * 2;
+		vector<vector<Point>> contours;
+	    vector<Vec4i> hierarchy;
+		int lowerThreshold = i;
+		int upperThreshold = (int)min(lowerThreshold * 3, 255);
+
+		Canny(grayImage, grayImage, lowerThreshold, upperThreshold);
+		Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 2, 2 * 2 + 2), Point(2, 2));
+		dilate(grayImage, grayImage, element);
+		namedWindow("Canny", WINDOW_AUTOSIZE);
+		imshow("Canny", grayImage);
+		 
+		findContours(grayImage, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+		
+		namedWindow("con", WINDOW_AUTOSIZE);
+		imshow("con", image); 
+
+	
+		vector<Point> points;
+
+		for (int i = 0; i >= 0; i = hierarchy[i][0])
+		{
+
+			double area = contourArea(contours[i]);
+			cout << "area of object # " << i << " = " << area << endl;
+
+			double epsilon = .02 * arcLength(contours[i], true);
+
+
+			approxPolyDP(contours[i], points, epsilon, true);
+
+
+			if (points.size() == 4)
+			{
+				cout << "THIS IS A RECTANGLE, SIZE " << points.size() << endl;
+			}
+			else
+			{
+				cout << "THIS IS NOT A RECTANGLE, SIZE " << points.size() << endl;
+				continue;
+			}
+
+			if (area < 2000) {
+				continue;
+			}
+
+			double length = arcLength(contours[i], true);
+			cout << "length of object # " << i << " = " << length << endl;
+
+
+			Rect rectangle = boundingRect(contours[i]);
+			Mat disp(image, rectangle);
+			books.push_back(rectangle);
+			bookContours.push_back(contours[i]);
+		}
 	}
-	else if (meanColor > 130) 
-	{
-		lowerThreshold = (int)max(double(0), (1 - sigma) * (255 - meanColor));
-		upperThreshold = lowerThreshold * 2;
-	}
-	else if (meanColor < 60) 
-	{
-		lowerThreshold = (int)max(double(0), (1 - 2 * sigma) * meanColor);
-		upperThreshold = lowerThreshold * 2;
-	}
-	else
-	{
-		lowerThreshold = (int)max(double(0), (1 - sigma) * meanColor);
-		upperThreshold = lowerThreshold * 2;
-	}
+
+	return books;
 }
+
 
 /*
 * findMakers:
@@ -208,119 +258,66 @@ bool findMarkers(Mat image)
 	return false;
 }
 
-
-int main(int argc, char* argv[])
+/*
+* bookAlreadyFound:
+*	Function takes a vector that has the location of books and check it with
+*		new points to see if we already got this book
+*		images seen on book covers
+*		Postconditions: booksFound contains points of books, x and y are valid points
+*       Postconditions: true or false of return depending on whether the book has already been found.
+*/
+bool bookAlreadyFound(vector<Point> booksFound, int x, int y)
 {
-	//Mat image = imread("bookTest.jpg");
-	Mat image = imread("bookTest.jpg");
-	Mat greyImage;
-	vector<vector<Point>> contours;
-	vector<Vec4i> hierarchy;
-
-	
-	
-	cvtColor(image, greyImage, COLOR_BGR2GRAY);
-	GaussianBlur(greyImage, greyImage, Size(3, 3), 0);
-
-	Scalar meanColor = mean(greyImage);
-	cout << " " << meanColor[0] << endl;
-	
-	int lower = 0;
-	int upper = 0;
-	findBounds(meanColor[0], lower, upper);
-
-	//edged = cv2.Canny(gray_image, lower, upper)
-	//cv2.imshow('Edges', edged)
-
-	//threshold(greyImage, greyImage, 0, 255, THRESH_OTSU + THRESH_BINARY);
-	Canny(greyImage, greyImage, lower, upper);
-	//double threshold = 100;
-	//Canny(greyImage, greyImage, threshold, threshold * 2);
-	dilate(greyImage, greyImage, Mat(), Point(-1, -1));
-	namedWindow("Canny", WINDOW_AUTOSIZE);
-	imshow("Canny", greyImage);
-
-	
-
-
-	imshow("Canny1", greyImage);
-	findContours(greyImage, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
-	
-	drawContours(image, contours, -1, Scalar(0, 255, 0), 2);
-	namedWindow("con", WINDOW_AUTOSIZE);
-	imshow("con", image);
-	int bookNumber = 0;
-	vector<Point> points;
-
-	for (int i = 0; i >= 0; i = hierarchy[i][0])
+	for (int i = 0; i < booksFound.size(); i++)
 	{
-		
-		double area = contourArea(contours[i]);
-		cout << "area of object # " << i << " = " << area << endl;
-
-		double epsilon = .02 * arcLength(contours[i], true);
-
-		
-		approxPolyDP(contours[i], points, epsilon, true);
-
-
-		if (points.size() >= 4 && points.size() <= 7)
+		if((booksFound[i].x - 10) < x && x < (booksFound[i].x + 10))
 		{
-			cout << "THIS IS A RECTANGLE, SIZE " << points.size() << endl;
-		}
-		else
-		{
-			cout << "THIS IS NOT A RECTANGLE, SIZE " << points.size()  << endl;
-			continue;
-		}
-
-
-		
-		if (area < 2000) {
-			continue;
-		}
-
-		double length = arcLength(contours[i], true);
-		cout << "length of object # " << i << " = " << length << endl;
-
-
-		Rect rectangle = boundingRect(contours[i]);
-		RotatedRect rotateRectangle = minAreaRect(contours[i]);
-		//storing rectangle vertices. The order is bottomLeft, topLeft, topRight, bottomRight.
-		Point2f points[4];
-		rotateRectangle.points(points);
-
-		cout << "points of object # " << i << " = ";
-		for (int j = 0; j < 4; j++)
-		{
-			cout << points[j] << ",";
-		}
-
-		Mat disp(image, rectangle);
-
-		namedWindow("test", WINDOW_AUTOSIZE);
-		imshow("test", disp);
-		waitKey(0);
-
-		cout << endl << endl;
-		
-		//after we have found a possible rectangle, do more checks to see
-		//if the object has any markers or is just one color.
-		if (isSolidColor(disp) || !findMarkers(disp)) {
-		    continue;
-		}
-		// otherwise
-		else {
-			// label it as a book and draw the contour
-			string tmp = "Book [" + std::to_string(bookNumber) + "]";
-			putText(image, tmp, Point(points[1].x + 15, points[1].y - 15), FONT_HERSHEY_COMPLEX_SMALL, 1, color, 2.9);
-			bookNumber++;
-			drawContours(image, contours, bookNumber, color, 2);
-			// cv::rectangle(image, rectangle, color, 2);
+			if ((booksFound[i].y - 10) < y && y < (booksFound[i].y + 10))
+			{
+				return true;
+			}
 		}
 	}
 
+	return false;
+}
+
+int main(int argc, char* argv[])
+{
+	Mat image = imread("bookTest#5.jpg");
+	vector<vector<Point>> contours;
+	vector<Rect> books = findBooks(image, contours);
+	
+    int bookNumber = 0;
+	vector<Point> foundBooks;
+
+    for (int i = 0; i < books.size(); i++)
+    {
+		Mat disp(image, books[i]);
+
+		if (isSolidColor(disp) || !findMarkers(disp)) 
+		{
+		    continue;
+		}
+		else 
+		{
+			if (!bookAlreadyFound(foundBooks, books[i].x, books[i].y))
+			{
+				drawContours(image, contours, i, Scalar(0, 255, 0), 2);
+				foundBooks.push_back(Point(books[i].x, books[i].y));
+				cout << "book x " << books[i].x;
+				cout << "book y " << books[i].y;
+				
+				string tmp = "Book [" + std::to_string(bookNumber) + "]";
+				putText(image, tmp, Point(books[i].x + 1, books[i].y + 20), FONT_HERSHEY_COMPLEX_SMALL, 1, color, 2.9);
+				bookNumber++;
+			}
+		}
+    }
+
 	namedWindow("Output", WINDOW_AUTOSIZE);
+	//namedWindow("Output", WINDOW_NORMAL);
+	//resizeWindow("Output", 600, 600);
 	imshow("Output", image);
 	imwrite("output.jpg", image);
 	waitKey(0);
