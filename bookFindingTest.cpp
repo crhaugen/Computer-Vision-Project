@@ -331,13 +331,22 @@ int main(int argc, char* argv[])
 
 	// for each image in the directory look for books
 	for (int i = 0; i < count; i++) {
-
-		Mat image = imread(directoryImages[i]);
-		vector<vector<Point>> contours;
-		// find the books within the image
-		vector<Rect> books = findBooks(image, contours);
 		// create a number for the book
 		int bookNumber = 1;
+		// read in the image from the directory
+		Mat image = imread(directoryImages[i]);
+		// create a contour vector for the points
+		vector<vector<Point>> contours;
+		// create the initial image for each file it scans (image1.jpg, image2.jpg ... etc.)
+		string initialImage = "image" + std::to_string(i + 1);
+		// create a window to display the image
+		namedWindow(initialImage, WINDOW_AUTOSIZE);
+		// display the image
+		imshow(initialImage, image);
+		// display the image until user closes the window
+		waitKey(0);
+		// find the books within the image
+		vector<Rect> books = findBooks(image, contours);
 		// create a vector for the coordinates where the books were found
 		vector<Point> foundBooks;
 		// for each of the objects identified as a book
