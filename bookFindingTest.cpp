@@ -32,6 +32,7 @@ const int RED_POSITION = 2;
 const Scalar RED = Scalar(0, 0, 255);
 const Scalar GREEN = Scalar(0, 255, 0);
 const Scalar BLACK = Scalar(255, 255, 255);
+
 /*
 * Create Histogram function:
 *	This function creates a color histogram using 3D matrix and looping through an image assigning each of
