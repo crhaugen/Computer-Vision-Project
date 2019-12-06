@@ -14,13 +14,24 @@
 
 using namespace cv;
 using namespace std;
-const int bin = 4;
-const int bucketSize = 256 / bin;
+const int BIN = 4;
+const double PERCENT_SOLID_COLOR = .85;
+const int bucketSize = 256 / BIN;
+const double PERCENT_OF_COLOR = .40;
+const int MIN_RECT_WIDTH = 8;
+const int MIN_RECT_HEIGHT = 8;
+const int AREA_AROUND_RECT = 10;
+const int MIN_AREA_RECT = 1000;
+const int NUM_SIDE_RECT = 4;
+const int COLOR_CHANNEL = 3;
+const double PERCENT_DISTANCE_CONTOUR = .02;
 // Due to Open CV using BGR values - these are the array index equivalents
-const int blue = 0;
-const int green = 1;
-const int red = 2;
-const Scalar color = Scalar(0, 0, 255);
+const int BLUE_POSITION = 0;
+const int GREEN_POSITION = 1;
+const int RED_POSITION = 2;
+const Scalar RED = Scalar(0, 0, 255);
+const Scalar GREEN = Scalar(0, 255, 0);
+const Scalar BLACK = Scalar(255, 255, 255);
 /*
 * Create Histogram function:
 *	This function creates a color histogram using 3D matrix and looping through an image assigning each of
@@ -30,18 +41,18 @@ const Scalar color = Scalar(0, 0, 255);
 */
 Mat createHistogram(const Mat& image) {
 	// size is a constant - the # of buckets in each dimension
-	int dims[3] = { bin, bin, bin };
+	int dims[COLOR_CHANNEL] = { BIN, BIN, BIN };
 	// create 3D histogram of integers initialized to zero	
-	Mat hist(3, dims, CV_32S, Scalar::all(0));
+	Mat hist(COLOR_CHANNEL, dims, CV_32S, Scalar::all(0));
 	// traverse the image and create a histogram of the various colors
 	for (int row = 0; row < image.rows - 1; row++) {
 		for (int col = 0; col < image.cols - 1; col++) {
 			// add the blue pixels to the corresponding histogram bin
-			int b = static_cast<int>(image.at<Vec3b>(row, col)[blue] / bucketSize);
+			int b = static_cast<int>(image.at<Vec3b>(row, col)[BLUE_POSITION] / bucketSize);
 			// add the green pixels to the corresponding histogram bin
-			int g = static_cast<int>(image.at<Vec3b>(row, col)[green] / bucketSize);
+			int g = static_cast<int>(image.at<Vec3b>(row, col)[GREEN_POSITION] / bucketSize);
 			// add the red pixels to the corresponding histogram bin
-			int r = static_cast<int>(image.at<Vec3b>(row, col)[red] / bucketSize);
+			int r = static_cast<int>(image.at<Vec3b>(row, col)[RED_POSITION] / bucketSize);
 			// increment the bin by 1
 			hist.at<int>(b, g, r)++;
 		}
@@ -61,9 +72,9 @@ void findMostCommonColor(int& cBlue, int& cGreen, int& cRed, const Mat& hist) {
 	// sets most votes to 0
 	int mostVotes = hist.at<int>(0, 0, 0);
 	// Loops through each of the histogram bins to determine if that bin has more votes that mostVotes
-	for (int i = 0; i < bin; i++) {
-		for (int j = 0; j < bin; j++) {
-			for (int k = 0; k < bin; k++) {
+	for (int i = 0; i < BIN; i++) {
+		for (int j = 0; j < BIN; j++) {
+			for (int k = 0; k < BIN; k++) {
 				// if the bin has the most votes...
 				if (hist.at<int>(i, j, k) > mostVotes) {
 					// update the most common blue to the value in the first histogram bin
@@ -78,12 +89,13 @@ void findMostCommonColor(int& cBlue, int& cGreen, int& cRed, const Mat& hist) {
 			}
 		}
 	}
+	int numBuckets = 2;
 	// once the looping has completed set the most common red value to r * bucketSize + bucketSize/2;
-	cRed = static_cast<int>(cRed * bucketSize + bucketSize / 2);
+	cRed = static_cast<int>(cRed * bucketSize + bucketSize / numBuckets);
 	// once the looping has completed set the most common green value to g * bucketSize + bucketSize/2;
-	cGreen = static_cast<int>(cGreen * bucketSize + bucketSize / 2);
+	cGreen = static_cast<int>(cGreen * bucketSize + bucketSize / numBuckets);
 	// once the looping has completed set the most common blue value to b * bucketSize + bucketSize/2;
-	cBlue = static_cast<int>(cBlue * bucketSize + bucketSize / 2);
+	cBlue = static_cast<int>(cBlue * bucketSize + bucketSize / numBuckets);
 }
 
 /*
@@ -107,13 +119,14 @@ bool isSolidColor(const Mat& input) {
 	for (int row = 0; row < input.rows; row++) {
 		for (int col = 0; col < input.cols; col++) {
 			// store the image color values for comparison and debugging
-			int bPrime = static_cast<int>(input.at<Vec3b>(row, col)[blue]);
-			int gPrime = static_cast<int>(input.at<Vec3b>(row, col)[green]);
-			int rPrime = static_cast<int>(input.at<Vec3b>(row, col)[red]);
+			int bPrime = static_cast<int>(input.at<Vec3b>(row, col)[BLUE_POSITION]);
+			int gPrime = static_cast<int>(input.at<Vec3b>(row, col)[GREEN_POSITION]);
+			int rPrime = static_cast<int>(input.at<Vec3b>(row, col)[RED_POSITION]);
 			// compare the pixels in the image to the most common color +/- a bucketSize
-			if (input.at<Vec3b>(row, col)[blue] - bucketSize <= b && input.at<Vec3b>(row, col)[blue] + bucketSize >= b &&
-				input.at<Vec3b>(row, col)[green] - bucketSize <= g && input.at<Vec3b>(row, col)[green] + bucketSize >= g &&
-				input.at<Vec3b>(row, col)[red] - bucketSize <= r && input.at<Vec3b>(row, col)[red] + bucketSize >= r) {
+			if (input.at<Vec3b>(row, col)[BLUE_POSITION] - bucketSize <= b && input.at<Vec3b>(row, col)[BLUE_POSITION] + bucketSize >= b &&
+				input.at<Vec3b>(row, col)[GREEN_POSITION] - bucketSize <= g && input.at<Vec3b>(row, col)[GREEN_POSITION] + bucketSize >= g &&
+				input.at<Vec3b>(row, col)[RED_POSITION] - bucketSize <= r && input.at<Vec3b>(row, col)[RED_POSITION] + bucketSize >= r)
+			{
 				// if so increase the total
 				total++;
 			}
@@ -122,7 +135,7 @@ bool isSolidColor(const Mat& input) {
 	// divide the sum by the total number of pixels
 	total = total / ((double)input.rows * (double)input.cols);
 	// if the total pixels that match the most common color exceed 85%
-	if (total > .85)
+	if (total > PERCENT_SOLID_COLOR)
 		// the object is most likely a solid color (considering lighting, texture, shade, etc.)
 		return true;
 	// otherwise return false
@@ -145,7 +158,9 @@ vector<Rect> findBooks(Mat& image, vector<vector<Point>>& bookContours)
 	// convert the image to grayscale
 	cvtColor(image, grayImage, COLOR_BGR2GRAY);
 	// apply the gaussian blur
-	GaussianBlur(grayImage, grayImage, Size(3, 3), 2.5, 2.5, 4);
+	double sigmaX = 2.5;
+	double sigmaY = 2.5;
+	GaussianBlur(grayImage, grayImage, Size(3, 3), 2.5, 2.5);
 	// retrieve the mean color/intensity from the image
 	Scalar meanColor = mean(grayImage);
 	// cout << " " << meanColor[0] << endl;
@@ -162,7 +177,10 @@ vector<Rect> findBooks(Mat& image, vector<vector<Point>>& bookContours)
 		// apply canny filter to the image
 		Canny(grayImage, grayImage, lowerThreshold, upperThreshold);
 		// apply a gaussian blur to the image
-		GaussianBlur(grayImage, grayImage, Size(3, 3), 1.5, 1.5, 2);
+		double sigmaX = 1.5;
+		double sigmaY = 1.5;
+		int border = 2;
+		GaussianBlur(grayImage, grayImage, Size(3, 3), sigmaX, sigmaY, border);
 
 		// create a morphology rectangle to be used in dilation of the image
 		Mat element = getStructuringElement(MORPH_RECT, Size(4.5, 4.5), Point(1, 1));
@@ -179,18 +197,18 @@ vector<Rect> findBooks(Mat& image, vector<vector<Point>>& bookContours)
 			// calculate the area of the given contour
 			double area = contourArea(contours[i]);
 			// set the epsilon (maximum distance to contour) to 2% 
-			double epsilon = .02 * arcLength(contours[i], true);
+			double epsilon = PERCENT_DISTANCE_CONTOUR * arcLength(contours[i], true);
 			// apply contour approximation
 			approxPolyDP(contours[i], points, epsilon, true);
 
 			// if it does not have 4 points
-			if(points.size() != 4)
+			if (points.size() != NUM_SIDE_RECT)
 			{
 				// discard the object
 				continue;
 			}
 			// to reduce false positives from smaller segments of pixels, we set the min. contour area to 1000
-			if (area < 1000) {
+			if (area < MIN_AREA_RECT) {
 				continue;
 			}
 			// We then bind the object detected to a rectangle
@@ -226,7 +244,9 @@ bool findMarkers(Mat image)
 	// create morphology object to detect structures within the image
 	morphologyEx(grayImage, grayImage, MORPH_GRADIENT, element);
 	// apply a threshold to the colors/intensity of pixels within the image
-	threshold(grayImage, grayImage, 0.0, 255.0, THRESH_BINARY | THRESH_OTSU);
+	double minThresholdValue = 0.0;
+	double maxThresholdValue = 255;
+	threshold(grayImage, grayImage, minThresholdValue, maxThresholdValue, THRESH_BINARY | THRESH_OTSU);
 
 	// create an image for detecting the objects that are rectangular within the image
 	Mat connected;
@@ -247,7 +267,7 @@ bool findMarkers(Mat image)
 		//find all the rectangle -ish contours in the image
 		Rect rect = boundingRect(contours[i]);
 		// draw the contours for the image
-		drawContours(mask, contours, i, Scalar(255, 255, 255), FILLED);
+		drawContours(mask, contours, i, BLACK, FILLED);
 
 		// create a non-zero mask for detecting markers within the image
 		Mat nonZero(mask, rect);
@@ -256,10 +276,12 @@ bool findMarkers(Mat image)
 
 		//try to make it so that it won't be counted as an title/word unless it's at a certain
 		//size and has a certain amount of non zero pixels (text) 
-		if (ratioOfNonZeroPixel > .40 && (rect.height > 8 && rect.width > 8))
+		if (ratioOfNonZeroPixel > PERCENT_OF_COLOR &&
+			(rect.height > MIN_RECT_HEIGHT&& rect.width > MIN_RECT_WIDTH))
 		{
 			// create a rectangle around the markers found within the image
-			rectangle(image, rect, Scalar(0, 255, 0), 2);
+			int lineThickness = 2;
+			rectangle(image, rect, GREEN, lineThickness);
 			// return true for the marker being found
 			return true;
 		}
@@ -282,9 +304,9 @@ bool bookAlreadyFound(vector<Point> booksFound, int x, int y)
 	for (int i = 0; i < booksFound.size(); i++)
 	{
 		// check to see if the points have alread been found within the image
-		if ((booksFound[i].x - 10) < x && x < (booksFound[i].x + 10))
+		if ((booksFound[i].x - AREA_AROUND_RECT) < x && x < (booksFound[i].x + AREA_AROUND_RECT))
 		{
-			if ((booksFound[i].y - 10) < y && y < (booksFound[i].y + 10))
+			if ((booksFound[i].y - AREA_AROUND_RECT) < y && y < (booksFound[i].y + AREA_AROUND_RECT))
 			{
 				// return true if the book exists within our book vector
 				return true;
@@ -297,7 +319,7 @@ bool bookAlreadyFound(vector<Point> booksFound, int x, int y)
 
 /*
 * Main:
-*	The primary function will search the current program directory to find all .jpg images and search for books in 
+*	The primary function will search the current program directory to find all .jpg images and search for books in
 *		each image. We decided to add in the directory search functionality to reduce naming errors and demonstration
 *		purposes. This applies the algorithms mentioned above to produce output images of each of the test photos
 *		Preconditions: This can be run either directly or with use of the bash script
@@ -312,8 +334,8 @@ int main(int argc, char* argv[])
 	glob("./*.jpg", directoryImages, false);
 	// if directory is empty, notify user and close program
 	if (directoryImages.size() == 0) {
-		cout << "Error - no images were detected. Make sure the file extensions are '.jpg' format "<< 
-					"and try again." << endl;
+		cout << "Error - no images were detected. Make sure the file extensions are '.jpg' format " <<
+			"and try again." << endl;
 		return 0;
 	}
 	// lambda to remove the output images so it doesn't infinitely create images
@@ -367,13 +389,17 @@ int main(int argc, char* argv[])
 				if (!bookAlreadyFound(foundBooks, books[i].x, books[i].y))
 				{
 					// draw the contour around the book
-					drawContours(image, contours, i, Scalar(0, 255, 0), 2);
+					double contourLineThickness = 2;
+					drawContours(image, contours, i, GREEN, contourLineThickness);
 					// add the book to our collection of found books
 					foundBooks.push_back(Point(books[i].x, books[i].y));
 					// create a string of text to output the book number
 					string bookNum = "Book [" + std::to_string(bookNumber) + "]";
 					// output the book number above the 
-					putText(image, bookNum, Point(books[i].x + 1, books[i].y + 20), FONT_HERSHEY_COMPLEX_SMALL, .9, color, 2.9);
+					double lineThickness = .9;
+					double lineType = 2.9;
+					putText(image, bookNum, Point(books[i].x + 1, books[i].y + 20), 
+						FONT_HERSHEY_COMPLEX_SMALL, lineThickness, RED, lineType);
 					// increment the bookNumber
 					bookNumber++;
 				}
@@ -383,7 +409,7 @@ int main(int argc, char* argv[])
 		string name = "output" + std::to_string(i + 1);
 		// create a window to display the image
 		namedWindow(name, WINDOW_AUTOSIZE);
-		// display the image
+		// display the image 
 		imshow(name, image);
 		// write the output image to the file directory
 		imwrite(name + ".jpg", image);
